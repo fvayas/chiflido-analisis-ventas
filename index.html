@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Ventas - Taqueria</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --bg-primary: #0f172a; --bg-card: #1e293b; --bg-header: #334155; --accent: #f59e0b; --accent-hover: #fbbf24; --text-primary: #f8fafc; --text-secondary: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b; --border: #334155; --green: #22c55e; --red: #ef4444; --blue: #60a5fa; --purple: #a78bfa; --teal: #2dd4bf; --pink: #f43f5e; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-primary); color: var(--text-secondary); min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-header) 100%); padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent); flex-wrap: wrap; gap: 12px; }
+  .header h1 { font-size: 1.6rem; color: var(--accent); letter-spacing: -0.5px; }
+  .header .subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+
+  /* KPI CARDS */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 20px 30px; }
+  .kpi-card { background: var(--bg-card); border-radius: 12px; padding: 18px; border: 1px solid var(--border); transition: all 0.25s; position: relative; overflow: hidden; }
+  .kpi-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 8px 25px rgba(245,158,11,0.1); }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); opacity: 0; transition: opacity 0.25s; }
+  .kpi-card:hover::before { opacity: 1; }
+  .kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; }
+  .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 6px; }
+  .kpi-sub { font-size: 0.78rem; color: var(--text-dim); margin-top: 4px; }
+  .kpi-trend { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; margin-top: 6px; }
+  .kpi-trend.up { background: rgba(34,197,94,0.15); color: var(--green); }
+  .kpi-trend.down { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  /* CONTROLS */
+  .controls { padding: 12px 30px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .controls label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+  .year-btn { background: var(--bg-card); color: var(--text-muted); border: 1px solid #475569; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+  .year-btn.active { background: var(--accent); color: var(--bg-primary); border-color: var(--accent); font-weight: 600; }
+  .year-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  /* CHART CARDS */
+  .section-title { padding: 20px 30px 8px; font-size: 1.1rem; color: var(--accent); font-weight: 700; letter-spacing: -0.3px; }
+  .chart-card { background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+  .chart-card h3 { font-size: 0.95rem; color: var(--accent); margin-bottom: 12px; font-weight: 600; }
+  .chart-card .chart-desc { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 12px; }
+
+  /* GRID LAYOUTS */
+  .grid-1 { display: grid; grid-template-columns: 1fr; gap: 18px; padding: 10px 30px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 10px 30px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; padding: 10px 30px; }
+
+  /* TABLE */
+  .table-container { padding: 10px 30px 30px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 12px; overflow: hidden; font-size: 0.82rem; }
+  th { background: var(--bg-header); color: var(--accent); padding: 11px 14px; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(245,158,11,0.04); }
+
+  /* RANKING */
+  .ranking-list { list-style: none; }
+  .ranking-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 0.85rem; }
+  .ranking-list li:last-child { border-bottom: none; }
+  .ranking-pos { font-weight: 700; color: var(--accent); margin-right: 10px; min-width: 24px; }
+  .ranking-bar { height: 4px; border-radius: 2px; background: var(--accent); margin-top: 4px; transition: width 0.5s; }
+
+  /* MINI STAT */
+  .mini-stat { text-align: center; padding: 16px 10px; }
+  .mini-stat .value { font-size: 2rem; font-weight: 800; }
+  .mini-stat .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; margin-top: 6px; letter-spacing: 1px; }
+
+  /* FOOTER */
+  .footer { text-align: center; padding: 20px; color: var(--text-dim); font-size: 0.72rem; border-top: 1px solid var(--border); margin-top: 10px; }
+
+  /* HELP TOOLTIPS */
+  .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(245,158,11,0.2); color: var(--accent); font-size: 0.7rem; font-weight: 700; cursor: pointer; margin-left: 6px; vertical-align: middle; border: 1px solid rgba(245,158,11,0.4); transition: all 0.2s; }
+  .help-icon:hover { background: rgba(245,158,11,0.4); transform: scale(1.1); }
+  #floatingTip { display: none; position: fixed; background: #334155; color: #e2e8f0; padding: 12px 16px; border-radius: 10px; font-size: 0.82rem; font-weight: 400; max-width: 300px; line-height: 1.55; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid #475569; z-index: 99999; text-align: left; pointer-events: none; }
+  #floatingTip::after { content: ''; position: absolute; border: 7px solid transparent; }
+  #floatingTip.arrow-bottom::after { top: 100%; left: 50%; transform: translateX(-50%); border-top-color: #334155; }
+  #floatingTip.arrow-top::after { bottom: 100%; left: 50%; transform: translateX(-50%); border-bottom-color: #334155; }
+
+  /* GUIDE PANEL */
+  .guide-toggle { background: var(--accent); color: var(--bg-primary); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.82rem; transition: all 0.2s; }
+  .guide-toggle:hover { background: var(--accent-hover); }
+  .guide-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; margin: 0 30px 10px; padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.4s ease, padding 0.4s ease; }
+  .guide-panel.open { max-height: 2000px; padding: 24px 28px; }
+  .guide-panel h3 { color: var(--accent); margin-bottom: 14px; font-size: 1.05rem; }
+  .guide-section { margin-bottom: 16px; }
+  .guide-section h4 { color: var(--blue); font-size: 0.88rem; margin-bottom: 6px; }
+  .guide-section p { color: var(--text-muted); font-size: 0.82rem; line-height: 1.6; margin-bottom: 4px; }
+  .guide-section strong { color: var(--text-secondary); }
+
+  @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .kpi-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="floatingTip"></div>
+
+<div class="header">
+  <div>
+    <h1>Dashboard de Ventas - Taqueria</h1>
+    <div class="subtitle">Analisis completo de ventas mensuales | Corte de mes: dia 27</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;font-size:0.8rem;color:#94a3b8;">
+    <span id="lastUpdate"></span>
+    <button class="guide-toggle" onclick="toggleGuide()">? Guia</button>
+  </div>
+</div>
+
+<!-- GUIDE PANEL -->
+<div class="guide-panel" id="guidePanel">
+  <h3>Que significa cada parte del dashboard</h3>
+
+  <div class="guide-section">
+    <h4>Tarjetas de arriba (KPIs)</h4>
+    <p><strong>Ultimo Mes:</strong> Cuanto vendiste en el mes mas reciente, y si subio o bajo vs el mes anterior.</p>
+    <p><strong>Promedio Mensual:</strong> Lo que vendes en un mes "normal", sacando el promedio de todos los meses.</p>
+    <p><strong>Prom. Ultimos 3 Meses:</strong> Promedio solo de los 3 meses mas recientes. Muestra como te va AHORITA.</p>
+    <p><strong>Mejor / Peor Mes:</strong> El mes donde mas y donde menos vendiste en toda la historia.</p>
+    <p><strong>Mediana:</strong> Si ordenas todos tus meses de menor a mayor, es el que queda justo a la mitad. Mas confiable que el promedio porque no se distorsiona por meses extremos.</p>
+    <p><strong>Total Acumulado:</strong> La suma de TODO lo que has vendido desde que empezaste.</p>
+    <p><strong>Var. Interanual:</strong> Compara el ultimo mes contra el mismo mes del ano pasado (ej: Mar 2026 vs Mar 2025).</p>
+    <p><strong>Crecimiento Total:</strong> Cuanto has crecido desde el primer mes hasta ahora, en porcentaje.</p>
+    <p><strong>Volatilidad:</strong> Que tan estables son tus ventas. Numero alto = ventas suben y bajan mucho.</p>
+  </div>
+
+  <div class="guide-section">
+    <h4>Graficos</h4>
+    <p><strong>Curva de Ventas:</strong> Linea amarilla = ventas reales. Linea roja punteada = media movil de 3 meses, que suaviza los picos para ver la tendencia real.</p>
+    <p><strong>Variacion Mensual (%):</strong> Barras verdes = subiste vs mes anterior. Rojas = bajaste. Te dice que tan fuerte fue el cambio.</p>
+    <p><strong>Comparativa Anual:</strong> Todos los anos encimados para comparar. Ves si 2025 va mejor que 2024, etc.</p>
+    <p><strong>Estacionalidad:</strong> Promedio historico de cada mes. Te dice cuales son tus meses fuertes y cuales los flojos.</p>
+    <p><strong>Acumulado Anual:</strong> Cuanto llevas vendido en cada ano conforme avanzan los meses. Sirve para ver si este ano vas adelante o atras.</p>
+    <p><strong>Ventas por Trimestre:</strong> Ventas agrupadas en bloques de 3 meses (Q1=Ene-Mar, Q2=Abr-Jun, Q3=Jul-Sep, Q4=Oct-Dic).</p>
+    <p><strong>Distribucion:</strong> Cuantos meses caen en cada rango de venta. Te dice donde se concentran normalmente tus ventas.</p>
+    <p><strong>Top 10 Mejores Meses:</strong> Ranking de tus 10 meses con mas ventas en la historia.</p>
+    <p><strong>Crecimiento Interanual (YoY):</strong> Cada mes vs el mismo mes del ano pasado. Verde = creciste, rojo = bajaste.</p>
+  </div>
+
+  <div class="guide-section">
+    <h4>Resumen Anual</h4>
+    <p><strong>Tarjetas de Resumen:</strong> Un resumen rapido por ano: total vendido, promedio mensual, mejor/peor mes, y cuanto creciste vs el ano anterior.</p>
+  </div>
+
+  <div class="guide-section">
+    <h4>Tabla de Detalle Mensual (columna por columna)</h4>
+    <p><strong>Periodo:</strong> El mes y ano al que corresponde la fila.</p>
+    <p><strong>Ventas:</strong> Total de ventas de ese mes (con el corte del dia 28 al 27).</p>
+    <p><strong>Var. MoM (Month over Month):</strong> Cuanto subiste o bajaste comparado con el mes inmediato anterior. Ejemplo: si en Febrero vendiste $30k y en Marzo $23k, la variacion es -24.6% (bajaste).</p>
+    <p><strong>Var. YoY (Year over Year):</strong> Compara ese mes con el MISMO mes del ano pasado. Ejemplo: Marzo 2026 vs Marzo 2025. Te dice si creciste o caiste respecto al ano anterior en ese mismo periodo.</p>
+    <p><strong>Dias:</strong> Cuantos dias tuvo ese mes de negocio (del 28 del mes anterior al 27 de este mes). Varia entre 27 y 31 dias segun el mes.</p>
+    <p><strong>Prom. Diario:</strong> Cuanto vendes POR DIA en ese mes. Se saca dividiendo el total del mes entre los dias reales que tuvo ese mes de negocio.</p>
+    <p><strong>% del Ano:</strong> Que porcentaje del total anual aporta ese mes. Si dice 12%, ese mes genero el 12% de todo lo que vendiste en el ano. Te ayuda a ver que meses pesan mas.</p>
+  </div>
+
+  <div class="guide-section">
+    <h4>Filtros</h4>
+    <p>Los <strong>botones de anos</strong> arriba filtran TODO el dashboard. Puedes activar/desactivar anos para comparar periodos especificos.</p>
+  </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- YEAR FILTER -->
+<div class="controls" id="yearControls"><label>Filtrar:</label></div>
+
+<!-- MAIN CURVE -->
+<div class="section-title">Tendencia General</div>
+<div class="grid-1">
+  <div class="chart-card">
+    <h3>Curva de Ventas Mensuales <span class="help-icon" data-tip="Linea amarilla = tus ventas reales mes a mes. Linea roja punteada = media movil de 3 meses, suaviza los picos para que veas la tendencia real sin tanto ruido.">?</span></h3>
+    <canvas id="mainChart"></canvas>
+  </div>
+</div>
+
+<!-- GROWTH + YEAR COMPARE -->
+<div class="section-title">Crecimiento y Comparativas</div>
+<div class="grid-2">
+  <div class="chart-card">
+    <h3>Variacion Mensual (%) <span class="help-icon" data-tip="Barras verdes = subiste vs el mes anterior. Rojas = bajaste. Te muestra que tan fuerte fue el cambio cada mes.">?</span></h3>
+    <canvas id="growthChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Comparativa Anual <span class="help-icon" data-tip="Todos los anos encimados en una grafica. Asi ves si agosto siempre es bueno, o si 2025 va mejor que 2024 en cada mes.">?</span></h3>
+    <canvas id="yearCompareChart"></canvas>
+  </div>
+</div>
+
+<!-- SEASONALITY + CUMULATIVE -->
+<div class="grid-2">
+  <div class="chart-card">
+    <h3>Estacionalidad <span class="help-icon" data-tip="Promedio historico de cada mes del ano. Te dice cuales son tus meses fuertes (vendes mas) y cuales los flojos.">?</span></h3>
+    <canvas id="seasonChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Acumulado Anual <span class="help-icon" data-tip="Cuanto llevas vendido en cada ano conforme avanzan los meses. Sirve para ver si este ano vas adelante o atras comparado con otros.">?</span></h3>
+    <canvas id="cumulativeChart"></canvas>
+  </div>
+</div>
+
+<!-- QUARTERLY + DISTRIBUTION -->
+<div class="section-title">Analisis por Trimestre y Distribucion</div>
+<div class="grid-2">
+  <div class="chart-card">
+    <h3>Ventas por Trimestre <span class="help-icon" data-tip="Ventas agrupadas en bloques de 3 meses: Q1=Ene-Mar, Q2=Abr-Jun, Q3=Jul-Sep, Q4=Oct-Dic. Ves que trimestre es mas fuerte cada ano.">?</span></h3>
+    <canvas id="quarterChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Distribucion de Ventas <span class="help-icon" data-tip="Cuantos meses caen en cada rango de venta. Ejemplo: 15 meses vendiste entre $20k y $25k. Te dice donde se concentran normalmente tus ventas.">?</span></h3>
+    <canvas id="histogramChart"></canvas>
+  </div>
+</div>
+
+<!-- RANKINGS + YOY -->
+<div class="section-title">Rankings y Variacion Interanual</div>
+<div class="grid-2">
+  <div class="chart-card">
+    <h3>Top 10 Mejores Meses <span class="help-icon" data-tip="Ranking de tus 10 meses con mas ventas en toda la historia. Las barras muestran la proporcion vs el mejor mes.">?</span></h3>
+    <div id="topMonths"></div>
+  </div>
+  <div class="chart-card">
+    <h3>Crecimiento Interanual (YoY) <span class="help-icon" data-tip="Cada mes comparado con el MISMO mes del ano pasado. Verde = creciste vs el ano anterior, rojo = bajaste. Ejemplo: Ene 2026 vs Ene 2025.">?</span></h3>
+    <canvas id="yoyChart"></canvas>
+  </div>
+</div>
+
+<!-- ANNUAL SUMMARY CARDS -->
+<div class="section-title">Resumen Anual</div>
+<div id="annualSummary" class="grid-1"></div>
+
+<!-- DETAIL TABLE -->
+<div class="section-title">Detalle Mensual</div>
+<div class="table-container">
+  <table>
+    <thead><tr>
+      <th>Periodo</th>
+      <th>Ventas <span class="help-icon" data-tip="Total de ventas en ese mes (corte del 28 al 27 del siguiente mes).">?</span></th>
+      <th>Var. MoM <span class="help-icon" data-tip="MoM = Month over Month. Cuanto subiste o bajaste comparado con el mes inmediato anterior. Ejemplo: si Feb fue $30k y Mar fue $23k, bajaste -24.6%.">?</span></th>
+      <th>Var. YoY <span class="help-icon" data-tip="YoY = Year over Year. Compara este mes con el MISMO mes del ano pasado. Ejemplo: Mar 2026 vs Mar 2025. Te dice si creciste o no respecto al ano anterior.">?</span></th>
+      <th>Dias <span class="help-icon" data-tip="Cantidad de dias que tuvo ese mes de negocio (del 28 del mes anterior al 27 de este mes). Varia entre 27 y 31 dias segun el mes.">?</span></th>
+      <th>Prom. Diario <span class="help-icon" data-tip="Cuanto vendes por dia en ese mes. Se calcula dividiendo el total del mes entre los dias reales que tuvo ese mes de negocio.">?</span></th>
+      <th>% del Ano <span class="help-icon" data-tip="Que porcentaje del total anual representa ese mes. Si dice 12%, ese mes aporto el 12% de todas las ventas del ano.">?</span></th>
+    </tr></thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <span id="footerUpdate"></span> | Datos desde VENTAS Y EGRESOOS (Google Sheets) | Corte mensual dia 27
+</div>
+
+<script>
+// ====== GUIA DE AYUDA ======
+function toggleGuide() {
+  var panel = document.getElementById('guidePanel');
+  panel.classList.toggle('open');
+}
+
+// ====== DATOS INCRUSTADOS ======
+var EMBEDDED_DATA = "2021-03:995.4,2021-04:6132.49,2021-05:6655.14,2021-06:6939.7,2021-07:8269.47,2021-08:8358.15,2021-09:9072.63,2021-10:7941.81,2021-11:7922.92,2021-12:6682.78,2022-01:8689.31,2022-02:9252.6,2022-03:7152.01,2022-04:10910.17,2022-05:12308.33,2022-06:9980.83,2022-07:12632.45,2022-08:13883.66,2022-09:12924.86,2022-10:12434.94,2022-11:12530.53,2022-12:11743.02,2023-01:14071.42,2023-02:14595.01,2023-03:12063.74,2023-04:13858.89,2023-05:14196.44,2023-06:14641.01,2023-07:14442.21,2023-08:14565.43,2023-09:14355.97,2023-10:13514.93,2023-11:13275.33,2023-12:13530.34,2024-01:16007.97,2024-02:35408.04,2024-03:30901.88,2024-04:32333.34,2024-05:26282.76,2024-06:26739.08,2024-07:26665.98,2024-08:23793.72,2024-09:22615.13,2024-10:22657.14,2024-11:23001.8,2024-12:20796.95,2025-01:24847.86,2025-02:26392.76,2025-03:25076.05,2025-04:26466.79,2025-05:28427.69,2025-06:28854.56,2025-07:27426.19,2025-08:31814.2,2025-09:27753.65,2025-10:25491.94,2025-11:30414.39,2025-12:25798.45,2026-01:30305.9,2026-02:30645.82,2026-03:23107.44";
+
+var MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+var QUARTER_NAMES = ['Q1 (Ene-Mar)','Q2 (Abr-Jun)','Q3 (Jul-Sep)','Q4 (Oct-Dic)'];
+var YEAR_COLORS = {
+  2021: {line:'#94a3b8', bg:'rgba(148,163,184,0.15)'},
+  2022: {line:'#60a5fa', bg:'rgba(96,165,250,0.15)'},
+  2023: {line:'#a78bfa', bg:'rgba(167,139,250,0.15)'},
+  2024: {line:'#34d399', bg:'rgba(52,211,153,0.15)'},
+  2025: {line:'#f59e0b', bg:'rgba(245,158,11,0.15)'},
+  2026: {line:'#f43f5e', bg:'rgba(244,63,94,0.15)'},
+  2027: {line:'#06b6d4', bg:'rgba(6,182,212,0.15)'}
+};
+
+var charts = {};
+var allMonthlyData = [];
+var activeYears = new Set();
+
+function parseEmbeddedData(str) {
+  return str.split(',').map(function(entry) {
+    var p = entry.split(':');
+    var ym = p[0].split('-').map(Number);
+    return { period: p[0], year: ym[0], month: ym[1], total: parseFloat(p[1]) };
+  });
+}
+
+function fmt(n) { return '$' + n.toLocaleString('es-EC', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function fmtK(n) { return n >= 1000 ? '$' + (n/1000).toFixed(1) + 'k' : '$' + n.toFixed(0); }
+function pct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+function getFiltered() { return allMonthlyData.filter(function(d) { return activeYears.has(d.year); }); }
+
+// Chart defaults
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = 'rgba(51,65,85,0.3)';
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
+Chart.defaults.plugins.tooltip.backgroundColor = '#1e293b';
+Chart.defaults.plugins.tooltip.titleColor = '#f59e0b';
+Chart.defaults.plugins.tooltip.bodyColor = '#e2e8f0';
+Chart.defaults.plugins.tooltip.borderColor = '#f59e0b';
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+
+// ====== KPIs ======
+function renderKPIs(data) {
+  if (!data.length) { document.getElementById('kpiGrid').innerHTML = ''; return; }
+  var totals = data.map(function(d){return d.total;});
+  var grand = totals.reduce(function(a,b){return a+b;},0);
+  var avg = grand / totals.length;
+  var max = Math.max.apply(null, totals);
+  var min = Math.min.apply(null, totals);
+  var maxM = data.find(function(d){return d.total===max;});
+  var minM = data.find(function(d){return d.total===min;});
+  var last = data[data.length-1];
+  var prev = data.length > 1 ? data[data.length-2] : null;
+  var chg = prev ? ((last.total - prev.total)/prev.total*100) : 0;
+  var yoy = null;
+  var sameMLY = allMonthlyData.find(function(d){return d.month===last.month && d.year===last.year-1;});
+  if (sameMLY) yoy = ((last.total - sameMLY.total)/sameMLY.total*100);
+
+  // Median
+  var sorted = totals.slice().sort(function(a,b){return a-b;});
+  var median = sorted.length % 2 === 0 ? (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2 : sorted[Math.floor(sorted.length/2)];
+
+  // Std dev
+  var variance = totals.reduce(function(s,v){return s+Math.pow(v-avg,2);},0)/totals.length;
+  var stdDev = Math.sqrt(variance);
+
+  // Growth first to last
+  var totalGrowth = data.length > 1 ? ((last.total - data[0].total)/data[0].total*100) : 0;
+
+  // Last 3 months avg
+  var last3 = data.slice(-3);
+  var avg3 = last3.reduce(function(s,d){return s+d.total;},0)/last3.length;
+
+  var html = '';
+  html += '<div class="kpi-card"><div class="kpi-label">Ultimo Mes</div><div class="kpi-value">'+fmt(last.total)+'</div><div class="kpi-sub">'+MONTH_NAMES[last.month-1]+' '+last.year+'</div>'+(prev?'<span class="kpi-trend '+(chg>=0?'up':'down')+'">'+(chg>=0?'&#9650;':'&#9660;')+' '+Math.abs(chg).toFixed(1)+'% vs ant.</span>':'')+'</div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Promedio Mensual</div><div class="kpi-value">'+fmt(avg)+'</div><div class="kpi-sub">'+data.length+' meses</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Prom. Ultimos 3 Meses</div><div class="kpi-value">'+fmt(avg3)+'</div><div class="kpi-sub">Tendencia reciente</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Mejor Mes</div><div class="kpi-value">'+fmt(max)+'</div><div class="kpi-sub">'+MONTH_NAMES[maxM.month-1]+' '+maxM.year+'</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Peor Mes</div><div class="kpi-value">'+fmt(min)+'</div><div class="kpi-sub">'+MONTH_NAMES[minM.month-1]+' '+minM.year+'</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Mediana</div><div class="kpi-value">'+fmt(median)+'</div><div class="kpi-sub">Valor central</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Total Acumulado</div><div class="kpi-value">'+fmt(grand)+'</div><div class="kpi-sub">'+data.length+' meses</div></div>';
+  if(yoy!==null) html += '<div class="kpi-card"><div class="kpi-label">Var. Interanual</div><div class="kpi-value"><span class="kpi-trend '+(yoy>=0?'up':'down')+'" style="font-size:1.2rem">'+(yoy>=0?'&#9650;':'&#9660;')+' '+Math.abs(yoy).toFixed(1)+'%</span></div><div class="kpi-sub">vs '+MONTH_NAMES[last.month-1]+' '+(last.year-1)+'</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Crecimiento Total</div><div class="kpi-value"><span class="kpi-trend '+(totalGrowth>=0?'up':'down')+'" style="font-size:1.2rem">'+(totalGrowth>=0?'&#9650;':'&#9660;')+' '+Math.abs(totalGrowth).toFixed(0)+'%</span></div><div class="kpi-sub">Desde '+MONTH_NAMES[data[0].month-1]+' '+data[0].year+'</div></div>';
+  html += '<div class="kpi-card"><div class="kpi-label">Volatilidad</div><div class="kpi-value">'+fmt(stdDev)+'</div><div class="kpi-sub">Desviacion estandar</div></div>';
+
+  document.getElementById('kpiGrid').innerHTML = html;
+}
+
+// ====== MAIN CHART with Moving Average ======
+function renderMainChart(data) {
+  var ctx = document.getElementById('mainChart');
+  if (charts.main) charts.main.destroy();
+  var labels = data.map(function(d){return MONTH_NAMES[d.month-1]+' '+d.year;});
+  var values = data.map(function(d){return d.total;});
+  var pointColors = data.map(function(d){return (YEAR_COLORS[d.year]||YEAR_COLORS[2027]).line;});
+
+  // 3-month moving average
+  var ma3 = values.map(function(v,i){
+    if(i<2) return null;
+    return Math.round((values[i]+values[i-1]+values[i-2])/3*100)/100;
+  });
+
+  charts.main = new Chart(ctx, {
+    type:'line',
+    data:{labels:labels, datasets:[
+      {label:'Ventas', data:values, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.08)', borderWidth:2, pointBackgroundColor:pointColors, pointBorderColor:pointColors, pointRadius:3, pointHoverRadius:6, fill:true, tension:0.3, order:1},
+      {label:'Media Movil 3M', data:ma3, borderColor:'#f43f5e', borderWidth:2, borderDash:[6,4], pointRadius:0, fill:false, tension:0.4, order:0}
+    ]},
+    options:{responsive:true, interaction:{intersect:false,mode:'index'},
+      plugins:{legend:{labels:{color:'#94a3b8'}}, tooltip:{callbacks:{label:function(c){return ' '+c.dataset.label+': $'+c.parsed.y.toLocaleString('es-EC',{minimumFractionDigits:2});}}}},
+      scales:{x:{ticks:{maxRotation:45,font:{size:9}}},y:{ticks:{callback:function(v){return fmtK(v);}}}}
+    }
+  });
+}
+
+// ====== GROWTH CHART ======
+function renderGrowthChart(data) {
+  var ctx = document.getElementById('growthChart');
+  if(charts.growth) charts.growth.destroy();
+  var labels = []; var values = []; var colors = [];
+  for(var i=1;i<data.length;i++){
+    var chg = (data[i].total-data[i-1].total)/data[i-1].total*100;
+    labels.push(MONTH_NAMES[data[i].month-1]+' '+data[i].year);
+    values.push(Math.round(chg*10)/10);
+    colors.push(chg>=0?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.7)');
+  }
+  charts.growth = new Chart(ctx, {
+    type:'bar',
+    data:{labels:labels,datasets:[{label:'Var. %',data:values,backgroundColor:colors,borderColor:colors.map(function(c){return c.replace('0.7','1');}),borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+pct(c.parsed.y);}}}},
+      scales:{x:{ticks:{maxRotation:45,font:{size:8}}},y:{ticks:{callback:function(v){return v+'%';}},grid:{color:'rgba(51,65,85,0.3)'}}}
+    }
+  });
+}
+
+// ====== YEAR COMPARE ======
+function renderYearCompare() {
+  var ctx = document.getElementById('yearCompareChart');
+  if(charts.yearCmp) charts.yearCmp.destroy();
+  var years = Array.from(activeYears).sort();
+  var datasets = years.map(function(y){
+    var yd = allMonthlyData.filter(function(d){return d.year===y;});
+    var mv = new Array(12).fill(null);
+    yd.forEach(function(d){mv[d.month-1]=d.total;});
+    var c = YEAR_COLORS[y]||YEAR_COLORS[2027];
+    return {label:String(y),data:mv,borderColor:c.line,backgroundColor:c.bg,borderWidth:2,pointRadius:3,tension:0.3,spanGaps:true};
+  });
+  charts.yearCmp = new Chart(ctx, {
+    type:'line',data:{labels:MONTH_NAMES,datasets:datasets},
+    options:{responsive:true,interaction:{intersect:false,mode:'index'},
+      plugins:{tooltip:{callbacks:{label:function(c){return ' '+c.dataset.label+': '+(c.parsed.y?'$'+c.parsed.y.toLocaleString('es-EC',{minimumFractionDigits:2}):'--');}}}},
+      scales:{y:{ticks:{callback:function(v){return fmtK(v);}}}}
+    }
+  });
+}
+
+// ====== SEASONALITY ======
+function renderSeasonChart() {
+  var ctx = document.getElementById('seasonChart');
+  if(charts.season) charts.season.destroy();
+  var sums=new Array(12).fill(0), counts=new Array(12).fill(0);
+  getFiltered().forEach(function(d){sums[d.month-1]+=d.total;counts[d.month-1]++;});
+  var avgs=sums.map(function(s,i){return counts[i]>0?Math.round(s/counts[i]*100)/100:0;});
+  var maxA=Math.max.apply(null,avgs);
+  charts.season = new Chart(ctx, {
+    type:'bar',data:{labels:MONTH_NAMES,datasets:[{label:'Promedio',data:avgs,
+      backgroundColor:avgs.map(function(v){return v===maxA?'rgba(245,158,11,0.85)':'rgba(245,158,11,0.3)';}),
+      borderColor:avgs.map(function(v){return v===maxA?'#f59e0b':'rgba(245,158,11,0.5)';}),borderWidth:1,borderRadius:6}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' $'+c.parsed.y.toLocaleString('es-EC',{minimumFractionDigits:2});}}}},
+      scales:{x:{grid:{display:false}},y:{ticks:{callback:function(v){return fmtK(v);}}}}}
+  });
+}
+
+// ====== CUMULATIVE ANNUAL ======
+function renderCumulativeChart() {
+  var ctx = document.getElementById('cumulativeChart');
+  if(charts.cumul) charts.cumul.destroy();
+  var years = Array.from(activeYears).sort();
+  var datasets = years.map(function(y){
+    var yd = allMonthlyData.filter(function(d){return d.year===y;}).sort(function(a,b){return a.month-b.month;});
+    var cumul = []; var sum = 0;
+    var mv = new Array(12).fill(null);
+    yd.forEach(function(d){sum+=d.total;mv[d.month-1]=Math.round(sum*100)/100;});
+    // Forward fill
+    for(var i=1;i<12;i++){if(mv[i]===null && mv[i-1]!==null) mv[i]=mv[i-1];}
+    var c = YEAR_COLORS[y]||YEAR_COLORS[2027];
+    return {label:String(y),data:mv,borderColor:c.line,backgroundColor:c.bg,borderWidth:2,pointRadius:2,tension:0.2,fill:false,spanGaps:false};
+  });
+  charts.cumul = new Chart(ctx,{
+    type:'line',data:{labels:MONTH_NAMES,datasets:datasets},
+    options:{responsive:true,interaction:{intersect:false,mode:'index'},
+      plugins:{tooltip:{callbacks:{label:function(c){return ' '+c.dataset.label+': '+(c.parsed.y?'$'+c.parsed.y.toLocaleString('es-EC',{minimumFractionDigits:2}):'--');}}}},
+      scales:{y:{ticks:{callback:function(v){return fmtK(v);}}}}}
+  });
+}
+
+// ====== QUARTERLY ======
+function renderQuarterChart() {
+  var ctx = document.getElementById('quarterChart');
+  if(charts.quarter) charts.quarter.destroy();
+  var years = Array.from(activeYears).sort();
+  var datasets = years.map(function(y){
+    var yd = allMonthlyData.filter(function(d){return d.year===y;});
+    var q = [0,0,0,0];
+    yd.forEach(function(d){
+      var qi = d.month<=3?0:d.month<=6?1:d.month<=9?2:3;
+      q[qi]+=d.total;
+    });
+    q = q.map(function(v){return Math.round(v*100)/100||null;});
+    var c = YEAR_COLORS[y]||YEAR_COLORS[2027];
+    return {label:String(y),data:q,backgroundColor:c.bg.replace('0.15','0.6'),borderColor:c.line,borderWidth:1,borderRadius:4};
+  });
+  charts.quarter = new Chart(ctx,{
+    type:'bar',data:{labels:QUARTER_NAMES,datasets:datasets},
+    options:{responsive:true,plugins:{tooltip:{callbacks:{label:function(c){return ' '+c.dataset.label+': $'+(c.parsed.y?c.parsed.y.toLocaleString('es-EC',{minimumFractionDigits:2}):'0');}}}},
+      scales:{x:{grid:{display:false}},y:{ticks:{callback:function(v){return fmtK(v);}}}}}
+  });
+}
+
+// ====== HISTOGRAM ======
+function renderHistogram(data) {
+  var ctx = document.getElementById('histogramChart');
+  if(charts.hist) charts.hist.destroy();
+  var vals = data.map(function(d){return d.total;});
+  var min = Math.min.apply(null,vals), max=Math.max.apply(null,vals);
+  var binCount = 10;
+  var binSize = Math.ceil((max-min)/binCount/1000)*1000;
+  if(binSize<1000) binSize=1000;
+  var bins = []; var labels = [];
+  var start = Math.floor(min/1000)*1000;
+  for(var b=start;b<max;b+=binSize){
+    var count = vals.filter(function(v){return v>=b&&v<b+binSize;}).length;
+    bins.push(count);
+    labels.push(fmtK(b)+'-'+fmtK(b+binSize));
+  }
+  charts.hist = new Chart(ctx,{
+    type:'bar',data:{labels:labels,datasets:[{label:'Meses',data:bins,backgroundColor:'rgba(96,165,250,0.5)',borderColor:'#60a5fa',borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+c.parsed.y+' meses';}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{stepSize:1},title:{display:true,text:'Frecuencia',color:'#94a3b8'}}}}
+  });
+}
+
+// ====== TOP MONTHS RANKING ======
+function renderTopMonths(data) {
+  var sorted = data.slice().sort(function(a,b){return b.total-a.total;}).slice(0,10);
+  var maxVal = sorted[0].total;
+  var html = '<ol class="ranking-list">';
+  sorted.forEach(function(d,i){
+    var pctW = (d.total/maxVal*100).toFixed(0);
+    var medal = i===0?'&#129351;':i===1?'&#129352;':i===2?'&#129353;':'';
+    html += '<li><div style="flex:1"><span class="ranking-pos">'+(i+1)+'</span><span>'+medal+' '+MONTH_NAMES[d.month-1]+' '+d.year+'</span><div class="ranking-bar" style="width:'+pctW+'%"></div></div><strong style="color:#f59e0b;margin-left:12px">'+fmt(d.total)+'</strong></li>';
+  });
+  html += '</ol>';
+  document.getElementById('topMonths').innerHTML = html;
+}
+
+// ====== YOY CHART ======
+function renderYoYChart(data) {
+  var ctx = document.getElementById('yoyChart');
+  if(charts.yoy) charts.yoy.destroy();
+  var labels=[],values=[],colors=[];
+  data.forEach(function(d){
+    var prev = allMonthlyData.find(function(x){return x.month===d.month&&x.year===d.year-1;});
+    if(prev){
+      var chg = (d.total-prev.total)/prev.total*100;
+      labels.push(MONTH_NAMES[d.month-1]+' '+d.year);
+      values.push(Math.round(chg*10)/10);
+      colors.push(chg>=0?'rgba(34,197,94,0.6)':'rgba(239,68,68,0.6)');
+    }
+  });
+  charts.yoy = new Chart(ctx,{
+    type:'bar',data:{labels:labels,datasets:[{label:'YoY %',data:values,backgroundColor:colors,borderRadius:3}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+pct(c.parsed.y);}}}},
+      scales:{x:{ticks:{maxRotation:45,font:{size:8}}},y:{ticks:{callback:function(v){return v+'%';}}}}}
+  });
+}
+
+// ====== ANNUAL SUMMARY ======
+function renderAnnualSummary() {
+  var years = Array.from(activeYears).sort();
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;padding:0 30px 10px;">';
+  years.forEach(function(y){
+    var yd = allMonthlyData.filter(function(d){return d.year===y;});
+    if(!yd.length) return;
+    var total = yd.reduce(function(s,d){return s+d.total;},0);
+    var avg = total/yd.length;
+    var maxM = yd.reduce(function(a,b){return a.total>b.total?a:b;});
+    var minM = yd.reduce(function(a,b){return a.total<b.total?a:b;});
+    var c = YEAR_COLORS[y]||YEAR_COLORS[2027];
+
+    // YoY total change
+    var prevYd = allMonthlyData.filter(function(d){return d.year===y-1;});
+    var prevTotal = prevYd.reduce(function(s,d){return s+d.total;},0);
+    var yoyChg = prevTotal>0?((total-prevTotal)/prevTotal*100):null;
+
+    html += '<div class="chart-card" style="border-left:4px solid '+c.line+'">';
+    html += '<h3 style="color:'+c.line+'">'+y+' <span style="font-size:0.75rem;color:#64748b">('+yd.length+' meses)</span></h3>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">';
+    html += '<div><div class="kpi-label">Total</div><div style="font-size:1.1rem;font-weight:700;color:#f8fafc">'+fmt(total)+'</div></div>';
+    html += '<div><div class="kpi-label">Promedio</div><div style="font-size:1.1rem;font-weight:700;color:#f8fafc">'+fmt(avg)+'</div></div>';
+    html += '<div><div class="kpi-label">Mejor</div><div style="font-size:0.85rem;color:#22c55e">'+MONTH_NAMES[maxM.month-1]+': '+fmt(maxM.total)+'</div></div>';
+    html += '<div><div class="kpi-label">Peor</div><div style="font-size:0.85rem;color:#ef4444">'+MONTH_NAMES[minM.month-1]+': '+fmt(minM.total)+'</div></div>';
+    if(yoyChg!==null) html += '<div style="grid-column:span 2"><span class="kpi-trend '+(yoyChg>=0?'up':'down')+'">'+(yoyChg>=0?'&#9650;':'&#9660;')+' '+Math.abs(yoyChg).toFixed(1)+'% vs '+(y-1)+'</span></div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+  document.getElementById('annualSummary').innerHTML = html;
+}
+
+// ====== TABLE ======
+// Calculate business month days: from 28th of prev month to 27th of this month
+function getBusinessDays(month, year) {
+  // Business month "month/year" runs from the 28th of (month-1) to the 27th of (month)
+  // So we need to count days from prev_month 28 to this_month 27
+  var prevMonth = month - 1;
+  var prevYear = year;
+  if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
+
+  // Days in the previous month (to know from 28 to end)
+  var daysInPrevMonth = new Date(prevYear, prevMonth, 0).getDate(); // last day of prevMonth
+  var daysFromPrev = daysInPrevMonth - 28 + 1; // 28th to end (inclusive)
+
+  // Days in current month up to 27th
+  var daysToCurrent = 27;
+
+  return daysFromPrev + daysToCurrent;
+}
+
+function renderTable(data) {
+  var tbody = document.getElementById('tableBody');
+  // Calculate year totals for % of year
+  var yearTotals = {};
+  data.forEach(function(d){if(!yearTotals[d.year])yearTotals[d.year]=0;yearTotals[d.year]+=d.total;});
+
+  var reversed = data.slice().reverse();
+  tbody.innerHTML = reversed.map(function(d,i){
+    var prev = reversed[i+1];
+    var mom = prev?((d.total-prev.total)/prev.total*100):null;
+    var sameMLY = allMonthlyData.find(function(x){return x.month===d.month&&x.year===d.year-1;});
+    var yoyC = sameMLY?((d.total-sameMLY.total)/sameMLY.total*100):null;
+    var bDays = getBusinessDays(d.month, d.year);
+    var dailyAvg = d.total / bDays;
+    var pctYear = yearTotals[d.year]>0?(d.total/yearTotals[d.year]*100):0;
+
+    return '<tr><td><strong>'+MONTH_NAMES[d.month-1]+' '+d.year+'</strong></td><td>'+fmt(d.total)+'</td>'+
+      '<td>'+(mom!==null?'<span style="color:'+(mom>=0?'#22c55e':'#ef4444')+'">'+(mom>=0?'&#9650;':'&#9660;')+' '+Math.abs(mom).toFixed(1)+'%</span>':'&#8212;')+'</td>'+
+      '<td>'+(yoyC!==null?'<span style="color:'+(yoyC>=0?'#22c55e':'#ef4444')+'">'+(yoyC>=0?'&#9650;':'&#9660;')+' '+Math.abs(yoyC).toFixed(1)+'%</span>':'&#8212;')+'</td>'+
+      '<td>'+bDays+'</td>'+
+      '<td>'+fmt(dailyAvg)+'</td>'+
+      '<td>'+pctYear.toFixed(1)+'%</td></tr>';
+  }).join('');
+}
+
+// ====== YEAR BUTTONS ======
+function renderYearButtons(years) {
+  var container = document.getElementById('yearControls');
+  container.innerHTML = '<label>Filtrar:</label>';
+  var allBtn = document.createElement('button');
+  allBtn.className = 'year-btn active'; allBtn.textContent = 'Todos';
+  allBtn.onclick = function(){activeYears=new Set(years);document.querySelectorAll('.year-btn').forEach(function(b){b.classList.add('active');});renderAll();};
+  container.appendChild(allBtn);
+  years.forEach(function(y){
+    var btn = document.createElement('button');
+    btn.className='year-btn active';btn.textContent=y;
+    btn.onclick=function(){
+      if(activeYears.has(y)){activeYears.delete(y);btn.classList.remove('active');}
+      else{activeYears.add(y);btn.classList.add('active');}
+      allBtn.classList.toggle('active',activeYears.size===years.length);
+      renderAll();
+    };
+    container.appendChild(btn);
+  });
+}
+
+// ====== RENDER ALL ======
+function renderAll() {
+  var filtered = getFiltered();
+  renderKPIs(filtered);
+  renderMainChart(filtered);
+  renderGrowthChart(filtered);
+  renderYearCompare();
+  renderSeasonChart();
+  renderCumulativeChart();
+  renderQuarterChart();
+  renderHistogram(filtered);
+  renderTopMonths(filtered);
+  renderYoYChart(filtered);
+  renderAnnualSummary();
+  renderTable(filtered);
+}
+
+// ====== INIT ======
+allMonthlyData = parseEmbeddedData(EMBEDDED_DATA);
+var years=[]; var seen={};
+allMonthlyData.forEach(function(d){if(!seen[d.year]){seen[d.year]=true;years.push(d.year);}});
+years.sort();
+activeYears = new Set(years);
+renderYearButtons(years);
+renderAll();
+document.getElementById('lastUpdate').textContent = 'Datos: 27 Mar 2026';
+document.getElementById('footerUpdate').textContent = 'Datos extraidos: 27 Mar 2026';
+
+// ====== FLOATING TOOLTIPS (click to show) ======
+(function() {
+  var tip = document.getElementById('floatingTip');
+  var currentIcon = null;
+
+  function showTip(icon) {
+    var text = icon.getAttribute('data-tip');
+    if (!text) return;
+    tip.textContent = text;
+    tip.style.display = 'block';
+
+    var rect = icon.getBoundingClientRect();
+    var tipW = tip.offsetWidth;
+    var tipH = tip.offsetHeight;
+
+    // Position above the icon by default
+    var top = rect.top - tipH - 12;
+    var left = rect.left + rect.width/2 - tipW/2;
+
+    // If not enough room above, show below
+    tip.className = '';
+    if (top < 10) {
+      top = rect.bottom + 12;
+      tip.classList.add('arrow-top');
+    } else {
+      tip.classList.add('arrow-bottom');
+    }
+
+    // Keep within viewport horizontally
+    if (left < 10) left = 10;
+    if (left + tipW > window.innerWidth - 10) left = window.innerWidth - tipW - 10;
+
+    tip.style.top = top + 'px';
+    tip.style.left = left + 'px';
+    currentIcon = icon;
+  }
+
+  function hideTip() {
+    tip.style.display = 'none';
+    currentIcon = null;
+  }
+
+  // Click to toggle
+  document.addEventListener('click', function(e) {
+    var icon = e.target.closest('.help-icon');
+    if (icon && icon.getAttribute('data-tip')) {
+      e.stopPropagation();
+      if (currentIcon === icon) {
+        hideTip();
+      } else {
+        showTip(icon);
+      }
+    } else {
+      hideTip();
+    }
+  });
+
+  // Also show on hover for desktop
+  document.addEventListener('mouseover', function(e) {
+    var icon = e.target.closest('.help-icon');
+    if (icon && icon.getAttribute('data-tip')) {
+      showTip(icon);
+    }
+  });
+  document.addEventListener('mouseout', function(e) {
+    var icon = e.target.closest('.help-icon');
+    if (icon) {
+      // Small delay to avoid flicker
+      setTimeout(function() {
+        if (currentIcon === icon) hideTip();
+      }, 200);
+    }
+  });
+})();
+</script>
+</body>
+</html>
